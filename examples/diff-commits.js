@@ -18,23 +18,63 @@ nodegit.Repository.open(path.resolve(__dirname, "../.git"))
 
   return commit.getDiff();
 })
-.done(function(diffList) {
+.then(function(diffList) {
+
+  var result = [];
+  var patchPromises = [];
+
   diffList.forEach(function(diff) {
-    diff.patches().then(function(patches) {
-      patches.forEach(function(patch) {
-        console.log("diff", patch.oldFile().path(), patch.newFile().path());
-        patch.hunks().then(function(hunks) {
-          hunks.forEach(function(hunk) {
-            console.log(hunk.header().trim());
-            hunk.lines().then(function(lines) {
-              lines.forEach(function(line) {
-                console.log(String.fromCharCode(line.origin()) +
-                  line.content().trim());
-              });
-            });
-          });
-        });
-      });
+    patchPromises.push(diff.patches()
+      .then(function(patches) {
+        result = result.concat(patches);
+      })
+    );
+  });
+
+  return Promise.all(patchPromises)
+    .then(function() {
+      return result;
     });
+})
+.then(function(patches){
+  var result = [];
+  var hunkPromises = [];
+
+  patches.forEach(function(patch, patchIndex) {
+    console.log("diff", patch.oldFile().path(), patch.newFile().path())
+    hunkPromises.push(patch.hunks()
+      .then(function(hunks) {
+        result = result.concat(hunks);
+      })
+    );
+  });
+
+  return Promise.all(hunkPromises)
+    .then(function() {
+      return result;
+    });
+})
+.then(function(hunks){
+  var result = [];
+  var linePromises = [];
+
+  hunks.forEach(function(hunk) {
+    console.log(hunk.header().trim());
+    linePromises.push(hunk.lines()
+      .then(function(lines) {
+        result = result.concat(lines);
+      })
+    );
+  });
+
+  return Promise.all(linePromises)
+    .then(function() {
+      return result;
+    });
+})
+.done(function(lines){
+  lines.forEach(function(line) {
+    console.log(String.fromCharCode(line.origin()) +
+      line.content().trim());
   });
 });
